@@ -1,0 +1,77 @@
+version: '3'
+
+services:
+  web:
+    build: .
+    container_name: ${PROJECT_NAME:-django}-web
+    ports:
+      - "${DJANGO_PORT:-8000}:8000"
+    volumes:
+      - .:/app
+    command: pwsh -Command "/init.ps1 python manage.py runserver 0.0.0.0:8000"
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=${SECRET_KEY:-djangosecretkey}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - DATABASE_NAME=${POSTGRES_DB:-taskdb}
+      - DATABASE_USER=${POSTGRES_USER:-postgres}
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DATABASE_HOST=${POSTGRES_HOST:-postgres}
+      - DATABASE_PORT=${POSTGRES_PORT:-5432}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME}
+      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL}
+      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
+    env_file:
+      - .env
+
+  worker:
+    build: .
+    container_name: ${PROJECT_NAME:-django}-worker
+    command: celery -A task_project worker --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=${SECRET_KEY:-djangosecretkey}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - DATABASE_NAME=${POSTGRES_DB:-taskdb}
+      - DATABASE_USER=${POSTGRES_USER:-postgres}
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DATABASE_HOST=${POSTGRES_HOST:-postgres}
+      - DATABASE_PORT=${POSTGRES_PORT:-5432}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+    env_file:
+      - .env
+
+  redis:
+    image: redis:7
+    container_name: ${PROJECT_NAME:-django}-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+  
+  postgres:
+    image: postgres:14
+    container_name: ${PROJECT_NAME:-django}-postgres
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-taskdb}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - .env
+
+volumes:
+  postgres_data:
+    name: ${PROJECT_NAME:-django}-postgres-data
